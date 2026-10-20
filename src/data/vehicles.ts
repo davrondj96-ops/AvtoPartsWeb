@@ -1,6 +1,757 @@
-import { VehicleBrand, SystemCategory, SelectedVehicle } from '../types/garage';
+import { BodyStyle, VehicleBrand, SystemCategory, SelectedVehicle } from '../types/garage';
+
+export const BODY_STYLE_LABELS: Record<BodyStyle, string> = {
+  sedan: 'Седан',
+  suv: 'Кроссовер / SUV',
+  hatchback: 'Хэтчбек',
+  coupe: 'Купе',
+  minivan: 'Микроавтобус',
+  pickup: 'Бортовой грузовик',
+};
+
+// Высокие кузова: на схематичной модели показываются с поднятой крышей
+export const isTallBody = (style: BodyStyle): boolean =>
+  style === 'suv' || style === 'minivan' || style === 'pickup';
 
 export const VEHICLE_BRANDS: VehicleBrand[] = [
+  // Марки и модели, распространённые на рынке Узбекистана
+  {
+    id: 'chevrolet',
+    name: 'Chevrolet',
+    country: 'Узбекистан',
+    models: [
+      {
+        id: 'chevrolet-cobalt',
+        name: 'Cobalt',
+        generations: [
+          {
+            id: 'chevrolet-cobalt-2',
+            name: 'II поколение (UzAuto Motors)',
+            years: '2013 — н.в.',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'chevrolet-cobalt-2-15-mt',
+                engine: '1.5 л B15D2 (106 л.с., Бензин)',
+                powerHp: 106,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'LS / LT',
+              },
+              {
+                id: 'chevrolet-cobalt-2-15-at',
+                engine: '1.5 л B15D2 (106 л.с., Бензин)',
+                powerHp: 106,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'LTZ',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'chevrolet-nexia',
+        name: 'Nexia 3',
+        generations: [
+          {
+            id: 'chevrolet-nexia-t250',
+            name: 'Nexia 3 (T250)',
+            years: '2016 — 2020',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'chevrolet-nexia-t250-15-mt',
+                engine: '1.5 л B15D2 (106 л.с., Бензин)',
+                powerHp: 106,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'LS / LT',
+              },
+              {
+                id: 'chevrolet-nexia-t250-15-at',
+                engine: '1.5 л B15D2 (106 л.с., Бензин)',
+                powerHp: 106,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'LTZ',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'chevrolet-lacetti',
+        name: 'Lacetti / Gentra',
+        generations: [
+          {
+            id: 'chevrolet-gentra-j200',
+            name: 'Gentra (UzAuto Motors)',
+            years: '2013 — н.в.',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'chevrolet-gentra-15-mt',
+                engine: '1.5 л B15D2 (107 л.с., Бензин)',
+                powerHp: 107,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Optimum',
+              },
+              {
+                id: 'chevrolet-gentra-15-at',
+                engine: '1.5 л B15D2 (107 л.с., Бензин)',
+                powerHp: 107,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Elegant',
+              },
+            ],
+          },
+          {
+            id: 'chevrolet-lacetti-j200',
+            name: 'Lacetti (J200)',
+            years: '2004 — 2013',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'chevrolet-lacetti-16-mt',
+                engine: '1.6 л F16D3 (109 л.с., Бензин)',
+                powerHp: 109,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'SE',
+              },
+              {
+                id: 'chevrolet-lacetti-18-at',
+                engine: '1.8 л F18D3 (122 л.с., Бензин)',
+                powerHp: 122,
+                transmission: '4-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'CDX',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'chevrolet-spark',
+        name: 'Spark',
+        generations: [
+          {
+            id: 'chevrolet-spark-m300',
+            name: 'III поколение (M300)',
+            years: '2010 — 2022',
+            bodyStyle: 'hatchback',
+            modifications: [
+              {
+                id: 'chevrolet-spark-m300-12-mt',
+                engine: '1.25 л B12D1 (85 л.с., Бензин)',
+                powerHp: 85,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'LS',
+              },
+              {
+                id: 'chevrolet-spark-m300-12-at',
+                engine: '1.25 л B12D1 (85 л.с., Бензин)',
+                powerHp: 85,
+                transmission: '4-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'LT',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'chevrolet-onix',
+        name: 'Onix',
+        generations: [
+          {
+            id: 'chevrolet-onix-2',
+            name: 'II поколение (UzAuto Motors)',
+            years: '2023 — н.в.',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'chevrolet-onix-2-12t-at',
+                engine: '1.2 л Turbo (132 л.с., Бензин)',
+                powerHp: 132,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'LTZ',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'chevrolet-tracker',
+        name: 'Tracker',
+        generations: [
+          {
+            id: 'chevrolet-tracker-3',
+            name: 'Tracker 2 (III поколение)',
+            years: '2021 — н.в.',
+            bodyStyle: 'suv',
+            modifications: [
+              {
+                id: 'chevrolet-tracker-3-12t-at',
+                engine: '1.2 л Turbo (132 л.с., Бензин)',
+                powerHp: 132,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Premier',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'chevrolet-malibu',
+        name: 'Malibu',
+        generations: [
+          {
+            id: 'chevrolet-malibu-9',
+            name: 'Malibu 2 (IX поколение)',
+            years: '2016 — 2023',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'chevrolet-malibu-9-15t-at',
+                engine: '1.5 л Turbo LFV (163 л.с., Бензин)',
+                powerHp: 163,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'LTZ',
+              },
+            ],
+          },
+          {
+            id: 'chevrolet-malibu-8',
+            name: 'Malibu (VIII поколение)',
+            years: '2012 — 2016',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'chevrolet-malibu-8-24-at',
+                engine: '2.4 л LE9 (167 л.с., Бензин)',
+                powerHp: 167,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'LTZ',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'chevrolet-captiva',
+        name: 'Captiva',
+        generations: [
+          {
+            id: 'chevrolet-captiva-c140',
+            name: 'C140 (рестайлинг)',
+            years: '2011 — 2018',
+            bodyStyle: 'suv',
+            modifications: [
+              {
+                id: 'chevrolet-captiva-c140-24-fwd',
+                engine: '2.4 л LE9 (167 л.с., Бензин)',
+                powerHp: 167,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'LT',
+              },
+              {
+                id: 'chevrolet-captiva-c140-24-awd',
+                engine: '2.4 л LE9 (167 л.с., Бензин)',
+                powerHp: 167,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Полный (AWD)',
+                trim: 'LTZ',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'chevrolet-damas',
+        name: 'Damas',
+        generations: [
+          {
+            id: 'chevrolet-damas-1',
+            name: 'Damas (микроавтобус)',
+            years: '1996 — н.в.',
+            bodyStyle: 'minivan',
+            modifications: [
+              {
+                id: 'chevrolet-damas-08-mt',
+                engine: '0.8 л F8C (38 л.с., Бензин)',
+                powerHp: 38,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Задний (RWD)',
+                trim: 'Van / Combi',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'chevrolet-labo',
+        name: 'Labo',
+        generations: [
+          {
+            id: 'chevrolet-labo-1',
+            name: 'Labo (бортовой грузовик)',
+            years: '1996 — н.в.',
+            bodyStyle: 'pickup',
+            modifications: [
+              {
+                id: 'chevrolet-labo-08-mt',
+                engine: '0.8 л F8C (38 л.с., Бензин)',
+                powerHp: 38,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Задний (RWD)',
+                trim: 'Бортовой',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'daewoo',
+    name: 'Daewoo',
+    country: 'Узбекистан',
+    models: [
+      {
+        id: 'daewoo-nexia',
+        name: 'Nexia',
+        generations: [
+          {
+            id: 'daewoo-nexia-n150',
+            name: 'Nexia (N150, рестайлинг)',
+            years: '2008 — 2016',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'daewoo-nexia-n150-15-8v',
+                engine: '1.5 л A15SMS 8V (80 л.с., Бензин)',
+                powerHp: 80,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'GL / GLE',
+              },
+              {
+                id: 'daewoo-nexia-n150-16-16v',
+                engine: '1.6 л F16D3 16V (109 л.с., Бензин)',
+                powerHp: 109,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'GLE',
+              },
+            ],
+          },
+          {
+            id: 'daewoo-nexia-n100',
+            name: 'Nexia (N100)',
+            years: '1995 — 2008',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'daewoo-nexia-n100-15-8v',
+                engine: '1.5 л G15MF 8V (75 л.с., Бензин)',
+                powerHp: 75,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'GL / GLE',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'daewoo-matiz',
+        name: 'Matiz',
+        generations: [
+          {
+            id: 'daewoo-matiz-m150',
+            name: 'Matiz (M100 / M150)',
+            years: '1998 — 2015',
+            bodyStyle: 'hatchback',
+            modifications: [
+              {
+                id: 'daewoo-matiz-08-mt',
+                engine: '0.8 л F8CV (51 л.с., Бензин)',
+                powerHp: 51,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Best / Standard',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'byd',
+    name: 'BYD',
+    country: 'Китай',
+    models: [
+      {
+        id: 'byd-chazor',
+        name: 'Chazor',
+        generations: [
+          {
+            id: 'byd-chazor-1',
+            name: 'Chazor (Qin Plus DM-i)',
+            years: '2024 — н.в.',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'byd-chazor-15-dmi',
+                engine: '1.5 л DM-i, подключаемый гибрид (110 л.с. ДВС + электромотор)',
+                powerHp: 110,
+                transmission: 'E-CVT (DHT)',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Flagship',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'byd-song-plus',
+        name: 'Song Plus',
+        generations: [
+          {
+            id: 'byd-song-plus-1',
+            name: 'Song Plus',
+            years: '2021 — н.в.',
+            bodyStyle: 'suv',
+            modifications: [
+              {
+                id: 'byd-song-plus-15-dmi',
+                engine: '1.5 л DM-i, подключаемый гибрид (110 л.с. ДВС + электромотор)',
+                powerHp: 110,
+                transmission: 'E-CVT (DHT)',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Flagship',
+              },
+              {
+                id: 'byd-song-plus-ev',
+                engine: 'Электромотор (204 л.с., EV)',
+                powerHp: 204,
+                transmission: 'Редуктор',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Flagship EV',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'byd-han',
+        name: 'Han',
+        generations: [
+          {
+            id: 'byd-han-1',
+            name: 'Han EV',
+            years: '2020 — н.в.',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'byd-han-ev',
+                engine: 'Электромотор (222 л.с., EV)',
+                powerHp: 222,
+                transmission: 'Редуктор',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Long Range',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'chery',
+    name: 'Chery',
+    country: 'Китай',
+    models: [
+      {
+        id: 'chery-tiggo-7-pro',
+        name: 'Tiggo 7 Pro',
+        generations: [
+          {
+            id: 'chery-tiggo-7-pro-1',
+            name: 'Tiggo 7 Pro',
+            years: '2020 — н.в.',
+            bodyStyle: 'suv',
+            modifications: [
+              {
+                id: 'chery-tiggo-7-pro-15t-cvt',
+                engine: '1.5 л Turbo SQRE4T15C (147 л.с., Бензин)',
+                powerHp: 147,
+                transmission: 'Вариатор CVT',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Prestige',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'chery-tiggo-4-pro',
+        name: 'Tiggo 4 Pro',
+        generations: [
+          {
+            id: 'chery-tiggo-4-pro-1',
+            name: 'Tiggo 4 Pro',
+            years: '2021 — н.в.',
+            bodyStyle: 'suv',
+            modifications: [
+              {
+                id: 'chery-tiggo-4-pro-15-mt',
+                engine: '1.5 л SQRE4G15C (113 л.с., Бензин)',
+                powerHp: 113,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Comfort',
+              },
+              {
+                id: 'chery-tiggo-4-pro-15-cvt',
+                engine: '1.5 л SQRE4G15C (113 л.с., Бензин)',
+                powerHp: 113,
+                transmission: 'Вариатор CVT',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Luxury',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'haval',
+    name: 'Haval',
+    country: 'Китай',
+    models: [
+      {
+        id: 'haval-jolion',
+        name: 'Jolion',
+        generations: [
+          {
+            id: 'haval-jolion-1',
+            name: 'Jolion',
+            years: '2021 — н.в.',
+            bodyStyle: 'suv',
+            modifications: [
+              {
+                id: 'haval-jolion-15t-dct',
+                engine: '1.5 л Turbo GW4G15K (143 л.с., Бензин)',
+                powerHp: 143,
+                transmission: '7-ст. робот DCT',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Premium',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'haval-h6',
+        name: 'H6',
+        generations: [
+          {
+            id: 'haval-h6-3',
+            name: 'III поколение',
+            years: '2021 — н.в.',
+            bodyStyle: 'suv',
+            modifications: [
+              {
+                id: 'haval-h6-3-15t-dct',
+                engine: '1.5 л Turbo (150 л.с., Бензин)',
+                powerHp: 150,
+                transmission: '7-ст. робот DCT',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Premium',
+              },
+              {
+                id: 'haval-h6-3-20t-awd',
+                engine: '2.0 л Turbo (190 л.с., Бензин)',
+                powerHp: 190,
+                transmission: '7-ст. робот DCT',
+                drivetrain: 'Полный (AWD)',
+                trim: 'Tech Plus',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'hyundai',
+    name: 'Hyundai',
+    country: 'Южная Корея',
+    models: [
+      {
+        id: 'hyundai-elantra',
+        name: 'Elantra',
+        generations: [
+          {
+            id: 'hyundai-elantra-cn7',
+            name: 'CN7 (VII поколение)',
+            years: '2020 — н.в.',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'hyundai-elantra-cn7-16-at',
+                engine: '1.6 л MPI (128 л.с., Бензин)',
+                powerHp: 128,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Comfort',
+              },
+              {
+                id: 'hyundai-elantra-cn7-20-ivt',
+                engine: '2.0 л MPI (149 л.с., Бензин)',
+                powerHp: 149,
+                transmission: 'Вариатор IVT',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Prestige',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'hyundai-tucson',
+        name: 'Tucson',
+        generations: [
+          {
+            id: 'hyundai-tucson-nx4',
+            name: 'NX4 (IV поколение)',
+            years: '2021 — н.в.',
+            bodyStyle: 'suv',
+            modifications: [
+              {
+                id: 'hyundai-tucson-nx4-20-at',
+                engine: '2.0 л MPI (150 л.с., Бензин)',
+                powerHp: 150,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Lifestyle',
+              },
+              {
+                id: 'hyundai-tucson-nx4-25-awd',
+                engine: '2.5 л GDI (190 л.с., Бензин)',
+                powerHp: 190,
+                transmission: '8-ст. АКПП',
+                drivetrain: 'Полный (AWD)',
+                trim: 'High-Tech',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'hyundai-sonata',
+        name: 'Sonata',
+        generations: [
+          {
+            id: 'hyundai-sonata-dn8',
+            name: 'DN8 (VIII поколение)',
+            years: '2019 — н.в.',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'hyundai-sonata-dn8-20-at',
+                engine: '2.0 л MPI (150 л.с., Бензин)',
+                powerHp: 150,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Comfort',
+              },
+              {
+                id: 'hyundai-sonata-dn8-25-at',
+                engine: '2.5 л MPI (180 л.с., Бензин)',
+                powerHp: 180,
+                transmission: '8-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Prestige',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'lada',
+    name: 'Lada',
+    country: 'Россия',
+    models: [
+      {
+        id: 'lada-granta',
+        name: 'Granta',
+        generations: [
+          {
+            id: 'lada-granta-fl',
+            name: 'Granta (рестайлинг)',
+            years: '2018 — н.в.',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'lada-granta-16-87',
+                engine: '1.6 л ВАЗ-11186 8V (87 л.с., Бензин)',
+                powerHp: 87,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Classic',
+              },
+              {
+                id: 'lada-granta-16-106',
+                engine: '1.6 л ВАЗ-21127 16V (106 л.с., Бензин)',
+                powerHp: 106,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Comfort',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'lada-vesta',
+        name: 'Vesta',
+        generations: [
+          {
+            id: 'lada-vesta-1',
+            name: 'Vesta (I поколение)',
+            years: '2015 — 2022',
+            bodyStyle: 'sedan',
+            modifications: [
+              {
+                id: 'lada-vesta-16-mt',
+                engine: '1.6 л ВАЗ-21129 16V (106 л.с., Бензин)',
+                powerHp: 106,
+                transmission: '5-ст. МКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Comfort',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
   {
     id: 'bmw',
     name: 'BMW',
@@ -322,25 +1073,47 @@ export const VEHICLE_BRANDS: VehicleBrand[] = [
           },
         ],
       },
+      {
+        id: 'kia-sportage',
+        name: 'Sportage',
+        generations: [
+          {
+            id: 'kia-sportage-nq5',
+            name: 'NQ5 (V поколение)',
+            years: '2021 — н.в.',
+            bodyStyle: 'suv',
+            modifications: [
+              {
+                id: 'kia-sportage-nq5-20-at',
+                engine: '2.0 л MPI (150 л.с., Бензин)',
+                powerHp: 150,
+                transmission: '6-ст. АКПП',
+                drivetrain: 'Передний (FWD)',
+                trim: 'Comfort',
+              },
+              {
+                id: 'kia-sportage-nq5-25-awd',
+                engine: '2.5 л GDI (190 л.с., Бензин)',
+                powerHp: 190,
+                transmission: '8-ст. АКПП',
+                drivetrain: 'Полный (AWD)',
+                trim: 'Prestige',
+              },
+            ],
+          },
+        ],
+      },
     ],
   },
 ];
 
-export const DEFAULT_VEHICLE: SelectedVehicle = {
-  brandId: 'bmw',
-  brandName: 'BMW',
-  modelId: 'bmw-3',
-  modelName: '3 серия',
-  generationId: 'bmw-3-g20',
-  generationName: 'G20 / G21 (VII поколение)',
-  years: '2018 — 2024',
-  bodyStyle: 'sedan',
-  modificationId: 'bmw-3-g20-320i',
-  engine: '2.0 л B48B20 (184 л.с., Бензин)',
-  transmission: '8-ст. АКПП Steptronic',
-  drivetrain: 'Задний (RWD)',
-  trim: 'M Sport Pure',
-};
+// Автомобиль по умолчанию — самая массовая модель на рынке Узбекистана
+export const DEFAULT_VEHICLE: SelectedVehicle = buildSelectedVehicle(
+  'chevrolet',
+  'chevrolet-cobalt',
+  'chevrolet-cobalt-2',
+  'chevrolet-cobalt-2-15-at'
+)!;
 
 export const GARAGE_SYSTEMS: SystemCategory[] = [
   {

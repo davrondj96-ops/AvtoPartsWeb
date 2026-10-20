@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock, MapPin, Phone } from 'lucide-react';
+import { STORE_INFO } from '../data/store';
 
 export const ContactsView: React.FC = () => (
   <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 space-y-6">
@@ -14,7 +15,7 @@ export const ContactsView: React.FC = () => (
       <div className="bg-[#12161F] border border-white/10 rounded-2xl p-6 space-y-2">
         <Phone className="w-5 h-5 text-[#F97316]" />
         <h2 className="text-sm font-semibold text-white">Отдел подбора запчастей</h2>
-        <p className="text-base font-bold font-mono text-white">+7 (495) 740-88-90</p>
+        <p className="text-base font-bold font-mono text-white">{STORE_INFO.phone}</p>
         <p className="text-xs text-slate-400">Консультация по совместимости OEM и аналогов</p>
       </div>
 
@@ -22,14 +23,14 @@ export const ContactsView: React.FC = () => (
         <MapPin className="w-5 h-5 text-[#38BDF8]" />
         <h2 className="text-sm font-semibold text-white">Склад и самовывоз</h2>
         <p className="text-xs text-slate-200 leading-relaxed">
-          г. Москва, Автозаводская ул., д. 23, корп. 7 (территория техцентра APEX GARAGE)
+          {STORE_INFO.pickupAddress}
         </p>
       </div>
 
       <div className="bg-[#12161F] border border-white/10 rounded-2xl p-6 space-y-2">
         <Clock className="w-5 h-5 text-emerald-400" />
         <h2 className="text-sm font-semibold text-white">Режим работы</h2>
-        <p className="text-xs text-slate-200">Ежедневно: 09:00 — 21:00</p>
+        <p className="text-xs text-slate-200">{STORE_INFO.workingHours}</p>
         <p className="text-xs text-slate-400">Выдача интернет-заказов через 30 минут после подтверждения</p>
       </div>
     </div>

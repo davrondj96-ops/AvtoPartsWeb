@@ -51,6 +51,7 @@ import {
   Sparkles,
   RefreshCw,
 } from 'lucide-react';
+import { formatPrice } from './lib/format';
 
 // Lazy load the 3D WebGL Garage Scene as requested
 const GarageScene3D = React.lazy(() => import('./components/GarageScene3D'));
@@ -99,7 +100,10 @@ function routeToHash(screen: ScreenMode, partId: string | null): string {
   return path ? `#/${path}` : '';
 }
 
-const MAX_PRICE_LIMIT = 80000;
+// Верхняя граница ценового фильтра — самая дорогая деталь каталога, с округлением вверх
+const PRICE_STEP = 100_000;
+const MAX_PRICE_LIMIT =
+  Math.ceil(Math.max(...AUTO_PARTS.map((p) => p.price)) / PRICE_STEP) * PRICE_STEP;
 
 const NAV_LINKS: { screen: ScreenMode; label: string }[] = [
   { screen: 'catalog', label: 'Каталог' },
@@ -462,6 +466,19 @@ export default function App() {
     [selectedSystemId, selectedSubcategoryId]
   );
 
+  // На главной сначала детали, подходящие к активному автомобилю, затем самые популярные
+  const popularParts = useMemo(() => {
+    const rank = { compatible: 0, verify_required: 1, no_vehicle: 2, incompatible: 3 };
+    return [...AUTO_PARTS]
+      .sort(
+        (a, b) =>
+          rank[evaluatePartCompatibility(a, selectedVehicle).status] -
+            rank[evaluatePartCompatibility(b, selectedVehicle).status] ||
+          b.popularity - a.popularity
+      )
+      .slice(0, 6);
+  }, [selectedVehicle]);
+
   const activeSystemObj = useMemo(
     () => GARAGE_SYSTEMS.find((s) => s.id === selectedSystemId) || null,
     [selectedSystemId]
@@ -783,7 +800,7 @@ export default function App() {
                           type="text"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="Амортизатор, 22-291448 или 31316873795..."
+                          placeholder="Фильтр, W 712/75 или 96879797..."
                           className="w-full h-11 pl-10 pr-3.5 rounded-xl bg-[#0B0D11] border border-white/15 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#38BDF8]"
                         />
                       </div>
@@ -801,13 +818,13 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => {
-                          setSearchQuery('31316873795');
+                          setSearchQuery('96879797');
                           setSelectedSystemId(null);
                           setScreen('catalog');
                         }}
                         className="font-mono text-slate-300 hover:text-[#F97316] underline"
                       >
-                        OEM 31316873795
+                        OEM 96879797
                       </button>
                       <span aria-hidden="true">·</span>
                       <button
@@ -825,13 +842,13 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => {
-                          setSearchQuery('Brembo');
+                          setSearchQuery('NGK');
                           setSelectedSystemId(null);
                           setScreen('catalog');
                         }}
                         className="text-slate-300 hover:text-[#F97316] underline"
                       >
-                        Диски Brembo
+                        Свечи NGK
                       </button>
                     </div>
                   </div>
@@ -862,7 +879,7 @@ export default function App() {
                             setVinInput(e.target.value.toUpperCase());
                             setVinNoticeVisible(false);
                           }}
-                          placeholder="Например: WBA5R1C00LFH12345"
+                          placeholder="Например: XWB3L32EDKA123456"
                           className="flex-1 h-11 px-3.5 rounded-xl bg-[#0B0D11] border border-white/15 text-sm font-mono uppercase text-white placeholder:text-slate-600 focus:outline-none focus:border-[#F97316]"
                         />
                         <button
@@ -1005,7 +1022,7 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {AUTO_PARTS.slice(0, 6).map((part) => renderPartCard(part))}
+              {popularParts.map((part) => renderPartCard(part))}
             </div>
           </section>
         </main>
@@ -1266,7 +1283,7 @@ export default function App() {
 
                             <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-white/10">
                               <span className="text-sm font-bold text-white font-mono tabular-nums">
-                                {part.price.toLocaleString('ru-RU')} ₽
+                                {formatPrice(part.price)}
                               </span>
                               <div className="flex items-center gap-1.5">
                                 <button
@@ -1565,14 +1582,14 @@ export default function App() {
                 <div className="flex items-center justify-between text-xs mb-1.5">
                   <span className="text-slate-400">Макс. цена:</span>
                   <span className="font-mono text-white tabular-nums">
-                    до {maxPriceFilter.toLocaleString('ru-RU')} ₽
+                    до {formatPrice(maxPriceFilter)}
                   </span>
                 </div>
                 <input
                   type="range"
-                  min={2000}
+                  min={PRICE_STEP}
                   max={MAX_PRICE_LIMIT}
-                  step={1000}
+                  step={PRICE_STEP}
                   value={maxPriceFilter}
                   onChange={(e) => setMaxPriceFilter(Number(e.target.value))}
                   className="w-full accent-[#F97316]"

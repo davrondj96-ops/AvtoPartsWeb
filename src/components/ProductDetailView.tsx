@@ -20,6 +20,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
+import { formatPrice } from '../lib/format';
 
 interface ProductDetailViewProps {
   part: AutoPart;
@@ -252,11 +253,11 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
             <div>
               <div className="flex items-baseline gap-3">
                 <span className="text-3xl font-bold text-white font-mono tabular-nums">
-                  {part.price.toLocaleString('ru-RU')} ₽
+                  {formatPrice(part.price)}
                 </span>
                 {part.oldPrice && (
                   <span className="text-sm text-slate-500 line-through font-mono tabular-nums">
-                    {part.oldPrice.toLocaleString('ru-RU')} ₽
+                    {formatPrice(part.oldPrice)}
                   </span>
                 )}
               </div>
@@ -308,7 +309,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               <span>
                 {justAdded
                   ? `Добавлено (${quantity} шт.)`
-                  : `В корзину · ${(part.price * quantity).toLocaleString('ru-RU')} ₽`}
+                  : `В корзину · ${formatPrice(part.price * quantity)}`}
               </span>
             </button>
 
@@ -458,7 +459,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                   </div>
                   <div className="text-right shrink-0">
                     <div className="text-sm font-bold text-white font-mono tabular-nums">
-                      {analog.price.toLocaleString('ru-RU')} ₽
+                      {formatPrice(analog.price)}
                     </div>
                     <button
                       type="button"

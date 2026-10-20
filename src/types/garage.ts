@@ -1,3 +1,5 @@
+export type BodyStyle = 'sedan' | 'suv' | 'hatchback' | 'coupe' | 'minivan' | 'pickup';
+
 export interface VehicleModification {
   id: string;
   engine: string;
@@ -11,7 +13,7 @@ export interface VehicleGeneration {
   id: string;
   name: string;
   years: string;
-  bodyStyle: 'sedan' | 'suv' | 'hatchback' | 'coupe';
+  bodyStyle: BodyStyle;
   modifications: VehicleModification[];
 }
 
@@ -36,7 +38,7 @@ export interface SelectedVehicle {
   generationId: string;
   generationName: string;
   years: string;
-  bodyStyle: 'sedan' | 'suv' | 'hatchback' | 'coupe';
+  bodyStyle: BodyStyle;
   modificationId: string;
   engine: string;
   transmission: string;

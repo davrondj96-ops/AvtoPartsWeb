@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { SelectedVehicle, SystemCategory, SystemCategoryId } from '../types/garage';
-import { GARAGE_SYSTEMS } from '../data/vehicles';
+import { BODY_STYLE_LABELS, GARAGE_SYSTEMS, isTallBody } from '../data/vehicles';
+import { CarModelAsset, findCarModel } from '../data/carModels';
 import { VehicleSchematic2D } from './VehicleSchematic2D';
 import { RotateCcw, Eye, Layers } from 'lucide-react';
 
@@ -20,6 +21,20 @@ interface GarageScene3DProps {
 const _projVec = new THREE.Vector3();
 const _targetPos = new THREE.Vector3();
 const _targetLook = new THREE.Vector3();
+
+// Длина схематичного автомобиля: реальные модели масштабируются к ней,
+// чтобы точки узлов (hotspots) оставались на своих местах
+const SCHEMATIC_LENGTH = 4.42;
+
+// Поворот, после которого перед модели смотрит в +z, как у схемы
+const FORWARD_ROTATION: Record<NonNullable<CarModelAsset['forward']>, number> = {
+  '+z': 0,
+  '-z': Math.PI,
+  '+x': -Math.PI / 2,
+  '-x': Math.PI / 2,
+};
+
+type RealModelStatus = 'none' | 'loading' | 'ready' | 'error';
 
 function createFloorGridTexture(maxAnisotropy: number): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -96,6 +111,10 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
   const [webglSupported, setWebglSupported] = useState<boolean>(true);
   const [force2DSchematic, setForce2DSchematic] = useState<boolean>(false);
   const [xrayBody, setXrayBody] = useState<boolean>(false);
+  const carAsset = findCarModel(vehicle);
+  const [realModelStatus, setRealModelStatus] = useState<RealModelStatus>(
+    carAsset ? 'loading' : 'none'
+  );
 
   // Store mutable state for the WebGL animation loop without tearing down canvas
   const stateRef = useRef({
@@ -116,6 +135,7 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
   }, [selectedSystemId, hoveredSystemId, reducedMotion, xrayBody, vehicle.bodyStyle]);
 
   useEffect(() => {
+    setRealModelStatus(carAsset && !force2DSchematic ? 'loading' : 'none');
     if (force2DSchematic) return;
     const container = canvasMountRef.current;
     if (!container) return;
@@ -583,6 +603,83 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
       proxyMeshes.push(proxy);
     });
 
+    // Реальная 3D-модель автомобиля (если есть). Схематичный кузов и колёса
+    // скрываются, внутренние узлы остаются и видны в режиме «Рентген кузова».
+    const bodyAndWheelMats = new Set<THREE.Material>([
+      ...systemMaterials.body,
+      ...systemMaterials.wheels,
+    ]);
+    const schematicShell: THREE.Object3D[] = [];
+    const schematicInternals: THREE.Object3D[] = [];
+    vehicleGroup.children.forEach((obj) => {
+      if (proxyMeshes.includes(obj as THREE.Mesh)) return;
+      const mat = (obj as THREE.Mesh).material as THREE.Material | undefined;
+      (mat && bodyAndWheelMats.has(mat) ? schematicShell : schematicInternals).push(obj);
+    });
+
+    let realModel: THREE.Object3D | null = null;
+    const realModelMats: THREE.Material[] = [];
+    let realModelOpacity = 1;
+    let sceneDisposed = false;
+
+    // Загрузчик glTF подгружается отдельным чанком только для машин с реальной моделью
+    const loadRealModel = async (asset: CarModelAsset) => {
+      const [{ GLTFLoader }, { MeshoptDecoder }] = await Promise.all([
+        import('three/addons/loaders/GLTFLoader.js'),
+        import('three/addons/libs/meshopt_decoder.module.js'),
+      ]);
+      const loader = new GLTFLoader();
+      loader.setMeshoptDecoder(MeshoptDecoder);
+      const gltf = await loader.loadAsync(`${import.meta.env.BASE_URL}models/${asset.file}`);
+      return gltf.scene;
+    };
+
+    if (carAsset) {
+      loadRealModel(carAsset).then(
+        (model) => {
+          if (sceneDisposed) return;
+          model.rotation.y = FORWARD_ROTATION[carAsset.forward ?? '+z'];
+          model.updateMatrixWorld(true);
+
+          // Масштаб по длине, центр по x/z, колёса на полу
+          const box = new THREE.Box3().setFromObject(model);
+          const size = box.getSize(new THREE.Vector3());
+          const center = box.getCenter(new THREE.Vector3());
+          model.position.set(-center.x, -box.min.y, -center.z);
+          const holder = new THREE.Group();
+          holder.add(model);
+          holder.scale.setScalar(
+            (carAsset.lengthMeters ?? SCHEMATIC_LENGTH) / Math.max(size.z, 1e-6)
+          );
+
+          model.traverse((obj) => {
+            const mesh = obj as THREE.Mesh;
+            if (!mesh.isMesh) return;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            mats.forEach((m) => {
+              if (!realModelMats.includes(m)) {
+                m.userData.baseOpacity = m.opacity;
+                m.userData.baseTransparent = m.transparent;
+                realModelMats.push(m);
+              }
+            });
+          });
+
+          vehicleGroup.add(holder);
+          realModel = holder;
+          schematicShell.forEach((o) => (o.visible = false));
+          schematicInternals.forEach((o) => (o.visible = false));
+          setRealModelStatus('ready');
+        },
+        (err) => {
+          console.warn(`Не удалось загрузить 3D-модель ${carAsset.file}:`, err);
+          if (!sceneDisposed) setRealModelStatus('error');
+        }
+      );
+    }
+
     // Pointer Interaction (Hover & Click Raycasting with Throttling)
     let lastRaycastTime = 0;
     const onPointerMove = (e: PointerEvent) => {
@@ -664,7 +761,7 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
       } = stateRef.current;
 
       // Adapt roof height smoothly for SUV vs Sedan
-      const targetRoofScaleY = bodyStyle === 'suv' ? 1.32 : 1.0;
+      const targetRoofScaleY = isTallBody(bodyStyle) ? 1.32 : 1.0;
       cabinRoof.scale.y = THREE.MathUtils.damp(cabinRoof.scale.y, targetRoofScaleY, 6, delta);
 
       // X-ray body shell opacity
@@ -680,6 +777,23 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
         8,
         delta
       );
+
+      // Реальная модель: в режиме рентгена становится полупрозрачной,
+      // а внутри показываются узлы схемы
+      if (realModel) {
+        schematicInternals.forEach((o) => (o.visible = isXray));
+        realModelOpacity = THREE.MathUtils.damp(realModelOpacity, isXray ? 0.16 : 1, 8, delta);
+        const seeThrough = realModelOpacity < 0.99;
+        realModelMats.forEach((m) => {
+          const transparent = seeThrough || m.userData.baseTransparent;
+          if (m.transparent !== transparent) {
+            m.transparent = transparent;
+            m.depthWrite = !seeThrough;
+            m.needsUpdate = true;
+          }
+          m.opacity = m.userData.baseOpacity * realModelOpacity;
+        });
+      }
 
       // Highlight active subsystem meshes in orange/cyan
       (Object.keys(systemMaterials) as SystemCategoryId[]).forEach((sysKey) => {
@@ -749,6 +863,7 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
     animate();
 
     return () => {
+      sceneDisposed = true;
       cancelAnimationFrame(animFrameId);
       resizeObserver.disconnect();
       timer.dispose();
@@ -789,7 +904,7 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [force2DSchematic]);
+  }, [force2DSchematic, carAsset]);
 
   if (!webglSupported || force2DSchematic) {
     return (
@@ -868,7 +983,29 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
       {/* Mandatory Schematic Model Disclaimer + Camera Dock (No backdrop-blur over WebGL) */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#12161F] border border-white/15 shadow-2xl max-w-[94vw]">
         <span className="text-xs text-slate-400 whitespace-nowrap pr-2 border-r border-white/10">
-          Схематическое изображение ({vehicle.bodyStyle === 'suv' ? 'Кроссовер / SUV' : 'Седан'})
+          {realModelStatus === 'ready' && carAsset ? (
+            <>
+              3D-модель: {carAsset.title}
+              {carAsset.credit && (
+                <>
+                  {' · '}
+                  <a
+                    href={carAsset.credit.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-white"
+                  >
+                    {carAsset.credit.author}
+                  </a>
+                  , {carAsset.credit.license}
+                </>
+              )}
+            </>
+          ) : realModelStatus === 'loading' ? (
+            'Загрузка 3D-модели…'
+          ) : (
+            `Схематическое изображение (${BODY_STYLE_LABELS[vehicle.bodyStyle]})`
+          )}
         </span>
 
         <button

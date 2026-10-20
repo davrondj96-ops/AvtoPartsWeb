@@ -10,6 +10,8 @@ import {
   MapPin,
   Info,
 } from 'lucide-react';
+import { formatPrice } from '../lib/format';
+import { DELIVERY_COST, FREE_DELIVERY_FROM, STORE_INFO } from '../data/store';
 
 interface CartCheckoutViewProps {
   cart: CartItem[];
@@ -54,7 +56,7 @@ export const CartCheckoutView: React.FC<CartCheckoutViewProps> = ({
     0
   );
   const deliveryCost =
-    deliveryMethod === 'pickup' || itemsSubtotal >= 15000 || itemsSubtotal === 0 ? 0 : 590;
+    deliveryMethod === 'pickup' || itemsSubtotal >= FREE_DELIVERY_FROM || itemsSubtotal === 0 ? 0 : DELIVERY_COST;
   const totalAmount = itemsSubtotal + deliveryCost;
 
   const handleSubmitOrder = (e: React.FormEvent) => {
@@ -87,7 +89,7 @@ export const CartCheckoutView: React.FC<CartCheckoutViewProps> = ({
       deliveryMethod,
       deliveryAddress:
         deliveryMethod === 'pickup'
-          ? 'Центральный техцентр APEX GARAGE: г. Москва, Автозаводская ул., д. 23, корп. 7'
+          ? STORE_INFO.pickupAddress
           : deliveryAddress.trim(),
       comment: comment.trim(),
       items: populatedItems,
@@ -148,7 +150,7 @@ export const CartCheckoutView: React.FC<CartCheckoutViewProps> = ({
                     )}
                   </div>
                   <div className="text-sm font-bold text-white font-mono tabular-nums shrink-0">
-                    {(part.price * quantity).toLocaleString('ru-RU')} ₽
+                    {formatPrice(part.price * quantity)}
                   </div>
                 </div>
               ))}
@@ -157,7 +159,7 @@ export const CartCheckoutView: React.FC<CartCheckoutViewProps> = ({
             <div className="flex items-center justify-between pt-2">
               <span className="text-sm font-medium text-slate-300">Итоговая сумма заказа:</span>
               <span className="text-2xl font-bold text-[#F97316] font-mono tabular-nums">
-                {completedOrder.totalAmount.toLocaleString('ru-RU')} ₽
+                {formatPrice(completedOrder.totalAmount)}
               </span>
             </div>
           </div>
@@ -276,7 +278,7 @@ export const CartCheckoutView: React.FC<CartCheckoutViewProps> = ({
 
               <div className="w-full sm:w-auto flex sm:flex-col items-center sm:items-end justify-between gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/10">
                 <div className="text-base font-bold text-white font-mono tabular-nums">
-                  {(part.price * quantity).toLocaleString('ru-RU')} ₽
+                  {formatPrice(part.price * quantity)}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -346,7 +348,7 @@ export const CartCheckoutView: React.FC<CartCheckoutViewProps> = ({
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Александр Волков"
+                placeholder="Азиз Каримов"
                 className="w-full h-11 px-3.5 rounded-xl bg-[#0B0D11] border border-white/15 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#F97316]"
               />
             </div>
@@ -357,7 +359,7 @@ export const CartCheckoutView: React.FC<CartCheckoutViewProps> = ({
                 type="tel"
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
-                placeholder="+7 (999) 123-45-67"
+                placeholder="+998 90 123-45-67"
                 className="w-full h-11 px-3.5 rounded-xl bg-[#0B0D11] border border-white/15 text-sm text-white font-mono placeholder:text-slate-500 focus:outline-none focus:border-[#F97316]"
               />
             </div>
@@ -399,13 +401,13 @@ export const CartCheckoutView: React.FC<CartCheckoutViewProps> = ({
                   type="text"
                   value={deliveryAddress}
                   onChange={(e) => setDeliveryAddress(e.target.value)}
-                  placeholder="г. Москва, Ленинский пр-т, д. 45, кв. 12"
+                  placeholder="г. Ташкент, ул. Амира Темура, д. 1, кв. 1"
                   className="w-full h-11 px-3.5 rounded-xl bg-[#0B0D11] border border-white/15 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#F97316]"
                 />
               </div>
             ) : (
               <div className="p-3 rounded-xl bg-[#0B0D11] border border-white/10 text-xs text-slate-300">
-                Пункт выдачи и техцентр: <strong className="text-white">г. Москва, Автозаводская ул., д. 23, корп. 7</strong> (ежедневно 09:00 — 21:00, бесплатно).
+                Пункт выдачи и техцентр: <strong className="text-white">{STORE_INFO.pickupAddress}</strong> ({STORE_INFO.workingHours.toLowerCase()}, бесплатно).
               </div>
             )}
 
@@ -428,19 +430,19 @@ export const CartCheckoutView: React.FC<CartCheckoutViewProps> = ({
             <div className="flex justify-between text-slate-400">
               <span>Товары ({populatedItems.reduce((acc, i) => acc + i.quantity, 0)} шт.):</span>
               <span className="font-mono text-slate-200 tabular-nums">
-                {itemsSubtotal.toLocaleString('ru-RU')} ₽
+                {formatPrice(itemsSubtotal)}
               </span>
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Стоимость доставки:</span>
               <span className="font-mono text-slate-200 tabular-nums">
-                {deliveryCost === 0 ? 'Бесплатно' : `${deliveryCost.toLocaleString('ru-RU')} ₽`}
+                {deliveryCost === 0 ? 'Бесплатно' : formatPrice(deliveryCost)}
               </span>
             </div>
             <div className="flex justify-between items-baseline pt-2 border-t border-white/10">
               <span className="text-sm font-semibold text-white">Итого к оплате:</span>
               <span className="text-2xl font-bold text-[#F97316] font-mono tabular-nums">
-                {totalAmount.toLocaleString('ru-RU')} ₽
+                {formatPrice(totalAmount)}
               </span>
             </div>
           </div>

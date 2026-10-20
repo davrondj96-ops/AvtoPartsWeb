@@ -1,6 +1,6 @@
 import React from 'react';
 import { SystemCategory, SystemCategoryId, SelectedVehicle } from '../types/garage';
-import { GARAGE_SYSTEMS } from '../data/vehicles';
+import { GARAGE_SYSTEMS, isTallBody } from '../data/vehicles';
 
 interface VehicleSchematic2DProps {
   vehicle: SelectedVehicle;
@@ -57,7 +57,7 @@ export const VehicleSchematic2D: React.FC<VehicleSchematic2DProps> = ({
           <line x1="80" y1="396" x2="920" y2="396" stroke="url(#floorGlow)" strokeWidth="3" />
 
           {/* Main Vehicle Silhouette (Sedan / SUV adaptive) */}
-          {vehicle.bodyStyle === 'suv' ? (
+          {isTallBody(vehicle.bodyStyle) ? (
             <path
               d="M95 320 L108 242 C115 224 135 215 168 208 L295 192 L390 124 C412 110 442 105 480 105 L780 108 C818 110 842 125 858 158 L892 232 L905 325 L870 355 L130 355 Z"
               fill="url(#carBodyGrad)"

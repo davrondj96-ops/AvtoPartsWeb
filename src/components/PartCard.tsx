@@ -4,6 +4,7 @@ import { evaluatePartCompatibility } from '../data/parts';
 import { PartIllustration } from './PartIllustration';
 import { CompatibilityHint } from './CompatibilityHint';
 import { Heart, ShoppingCart } from 'lucide-react';
+import { formatPrice } from '../lib/format';
 
 interface PartCardProps {
   part: AutoPart;
@@ -85,7 +86,7 @@ export const PartCard: React.FC<PartCardProps> = ({
         <div className="pt-3 border-t border-white/10 flex items-end justify-between gap-3">
           <div>
             <div className="text-lg font-bold text-white font-mono tabular-nums">
-              {part.price.toLocaleString('ru-RU')} ₽
+              {formatPrice(part.price)}
             </div>
             <div className="text-[11px] text-slate-400">
               {part.deliveryDays === 0
