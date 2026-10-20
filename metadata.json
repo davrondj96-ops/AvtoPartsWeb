@@ -1,0 +1,6 @@
+{
+  "name": "APEX GARAGE — Интерактивный каталог автозапчастей",
+  "description": "Интернет-магазин автомобильных запчастей с интерактивным 3D-гаражом, точным подбором деталей по модификации автомобиля и проверкой совместимости.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
