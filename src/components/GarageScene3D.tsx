@@ -982,7 +982,7 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
 
       {/* Mandatory Schematic Model Disclaimer + Camera Dock (No backdrop-blur over WebGL) */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#12161F] border border-white/15 shadow-2xl max-w-[94vw]">
-        <span className="text-xs text-slate-400 whitespace-nowrap pr-2 border-r border-white/10">
+        <span className="w-full sm:w-auto text-center text-xs text-slate-400 sm:whitespace-nowrap sm:pr-2 sm:border-r border-white/10">
           {realModelStatus === 'ready' && carAsset ? (
             <>
               3D-модель: {carAsset.title}
@@ -997,7 +997,16 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
                   >
                     {carAsset.credit.author}
                   </a>
-                  , {carAsset.credit.license}
+                  {', '}
+                  <a
+                    href={carAsset.credit.licenseUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-white"
+                  >
+                    {carAsset.credit.license}
+                  </a>
+                  {carAsset.credit.modified && ` (${carAsset.credit.modified})`}
                 </>
               )}
             </>
