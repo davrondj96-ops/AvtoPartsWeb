@@ -1034,10 +1034,10 @@ export default function App() {
       {screen === 'garage' && (
         <main className="relative flex-none flex flex-col lg:flex-row h-[calc(100dvh-7.5rem)] md:h-[calc(100dvh-4rem)] overflow-hidden bg-[#090B10]">
           {/* Left / Top Standard Duplicated Systems Menu (Accessible without 3D interaction) */}
-          <aside className="w-full lg:w-72 bg-[#11151E] border-b lg:border-b-0 lg:border-r border-white/10 flex flex-col z-20 shrink-0 max-h-[34vh] lg:max-h-none">
+          <aside className="w-full lg:w-72 bg-[#11151E] border-b lg:border-b-0 lg:border-r border-white/10 flex flex-col z-20 shrink-0">
             {/* Active Vehicle Info Header inside Garage */}
-            <div className="p-4 border-b border-white/10 space-y-2.5">
-              <div className="flex items-center justify-between gap-2">
+            <div className="p-3 lg:p-4 border-b border-white/10 space-y-2 lg:space-y-2.5">
+              <div className="hidden lg:flex items-center justify-between gap-2">
                 <span className="text-[11px] font-mono uppercase tracking-wider text-[#38BDF8]">
                   Активный автомобиль
                 </span>
@@ -1052,13 +1052,13 @@ export default function App() {
 
               {selectedVehicle ? (
                 <div>
-                  <div className="text-base font-bold text-white leading-tight">
+                  <div className="text-sm lg:text-base font-bold text-white leading-tight truncate lg:whitespace-normal">
                     {selectedVehicle.brandName} {selectedVehicle.modelName}{' '}
                     <span className="text-slate-300 font-normal">
                       {selectedVehicle.generationName}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-400 mt-1">
+                  <div className="text-xs text-slate-400 mt-1 truncate lg:whitespace-normal">
                     {selectedVehicle.years} · {selectedVehicle.engine}
                   </div>
                 </div>
@@ -1066,7 +1066,7 @@ export default function App() {
                 <div className="text-xs text-amber-300">Автомобиль не выбран</div>
               )}
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 lg:pt-1">
                 <button
                   type="button"
                   onClick={() => setScreen('home')}
@@ -1088,10 +1088,14 @@ export default function App() {
             </div>
 
             {/* Duplicated Standard Systems Menu (12 systems) */}
-            <div className="px-4 py-2 text-[11px] font-medium text-slate-400 border-b border-white/5">
+            <div className="hidden lg:block px-4 py-2 text-[11px] font-medium text-slate-400 border-b border-white/5">
               Все системы автомобиля (меню без 3D):
             </div>
-            <div className="flex-1 overflow-y-auto divide-y divide-white/5">
+            {/* На телефоне — горизонтальная лента, на широком экране — список */}
+            <div
+              aria-label="Системы автомобиля"
+              className="flex lg:flex-col gap-1.5 lg:gap-0 px-3 py-2 lg:p-0 overflow-x-auto lg:overflow-x-visible lg:overflow-y-auto lg:flex-1 lg:divide-y divide-white/5"
+            >
               {GARAGE_SYSTEMS.map((sys) => {
                 const isSelected = selectedSystemId === sys.id;
                 const isHovered = hoveredSystemId === sys.id;
@@ -1102,22 +1106,25 @@ export default function App() {
                     onClick={() => handleSelectSystemInGarage(sys.id)}
                     onMouseEnter={() => setHoveredSystemId(sys.id)}
                     onMouseLeave={() => setHoveredSystemId(null)}
-                    className={`w-full px-4 py-3 text-left flex items-center justify-between gap-2 transition-colors ${
+                    className={`shrink-0 lg:w-full px-3 py-2 lg:px-4 lg:py-3 rounded-lg lg:rounded-none border lg:border-0 text-left flex items-center justify-between gap-2 transition-colors ${
                       isSelected
-                        ? 'bg-[#F97316]/15 text-white'
+                        ? 'bg-[#F97316]/15 border-[#F97316]/60 text-white'
                         : isHovered
-                        ? 'bg-white/5 text-white'
-                        : 'text-slate-300 hover:bg-white/5'
+                        ? 'bg-white/5 border-white/10 text-white'
+                        : 'bg-[#161B26] lg:bg-transparent border-white/10 text-slate-300 hover:bg-white/5'
                     }`}
                   >
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold truncate">{sys.name}</div>
-                      <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                      <div className="text-xs font-semibold whitespace-nowrap lg:truncate">
+                        <span className="lg:hidden">{sys.shortName}</span>
+                        <span className="hidden lg:inline">{sys.name}</span>
+                      </div>
+                      <div className="hidden lg:block text-[11px] text-slate-400 truncate mt-0.5">
                         {sys.subcategories.map((s) => s.name).join(' · ')}
                       </div>
                     </div>
                     <ChevronRight
-                      className={`w-4 h-4 shrink-0 ${
+                      className={`hidden lg:block w-4 h-4 shrink-0 ${
                         isSelected ? 'text-[#F97316]' : 'text-slate-500'
                       }`}
                     />
@@ -1167,7 +1174,13 @@ export default function App() {
 
             {/* Slide-Over System & Subcategory Catalog Drawer inside Garage */}
             {garageDrawerOpen && activeSystemObj && (
-              <div className="absolute inset-y-0 right-0 z-30 w-full sm:w-[440px] md:w-[500px] bg-[#11151E] border-l border-white/15 shadow-2xl flex flex-col">
+              // На телефоне и планшете — на весь экран между шапкой и нижней панелью,
+              // на широком экране — боковая панель справа от 3D-сцены
+              <div
+                role="dialog"
+                aria-label={activeSystemObj.name}
+                className="fixed inset-x-0 top-16 bottom-14 md:bottom-0 z-30 lg:absolute lg:inset-x-auto lg:top-0 lg:bottom-0 lg:right-0 lg:w-[500px] bg-[#11151E] lg:border-l border-white/15 shadow-2xl flex flex-col"
+              >
                 {/* Drawer Header with Breadcrumbs */}
                 <div className="p-4 sm:p-5 border-b border-white/10 flex items-start justify-between gap-4">
                   <div>

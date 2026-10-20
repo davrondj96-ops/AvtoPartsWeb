@@ -36,6 +36,17 @@ const FORWARD_ROTATION: Record<NonNullable<CarModelAsset['forward']>, number> = 
 
 type RealModelStatus = 'none' | 'loading' | 'ready' | 'error';
 
+// Угол обзора камеры: на узких (портретных) экранах увеличивается, чтобы
+// горизонтальный охват оставался как на широком экране и машина помещалась целиком
+const BASE_FOV = 42;
+const BASE_ASPECT = 1.3;
+const MAX_FOV = 80;
+function fovForAspect(aspect: number): number {
+  if (aspect >= BASE_ASPECT) return BASE_FOV;
+  const halfTan = Math.tan(THREE.MathUtils.degToRad(BASE_FOV / 2)) * (BASE_ASPECT / aspect);
+  return Math.min(MAX_FOV, THREE.MathUtils.radToDeg(2 * Math.atan(halfTan)));
+}
+
 function createFloorGridTexture(maxAnisotropy: number): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
@@ -179,12 +190,8 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
     scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
     pmremGenerator.dispose();
 
-    const camera = new THREE.PerspectiveCamera(
-      42,
-      container.clientWidth / Math.max(container.clientHeight, 1),
-      0.1,
-      100
-    );
+    const initialAspect = container.clientWidth / Math.max(container.clientHeight, 1);
+    const camera = new THREE.PerspectiveCamera(fovForAspect(initialAspect), initialAspect, 0.1, 100);
     camera.position.set(4.1, 2.05, 4.4);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -737,6 +744,7 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
       const w = container.clientWidth;
       const h = Math.max(container.clientHeight, 1);
       camera.aspect = w / h;
+      camera.fov = fovForAspect(camera.aspect);
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
     };
@@ -981,8 +989,8 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
       </div>
 
       {/* Mandatory Schematic Model Disclaimer + Camera Dock (No backdrop-blur over WebGL) */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#12161F] border border-white/15 shadow-2xl max-w-[94vw]">
-        <span className="w-full sm:w-auto text-center text-xs text-slate-400 sm:whitespace-nowrap sm:pr-2 sm:border-r border-white/10">
+      <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#12161F]/90 sm:bg-[#12161F] border border-white/15 shadow-2xl w-[calc(100%-1rem)] sm:w-auto max-w-[94vw]">
+        <span className="w-full sm:w-auto text-center text-[10px] leading-tight sm:text-xs text-slate-400 sm:whitespace-nowrap sm:pr-2 sm:border-r border-white/10">
           {realModelStatus === 'ready' && carAsset ? (
             <>
               3D-модель: {carAsset.title}
@@ -1020,6 +1028,9 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
         <button
           type="button"
           onClick={() => setXrayBody((prev) => !prev)}
+          aria-label="Рентген кузова"
+          aria-pressed={xrayBody}
+          title="Рентген кузова"
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
             xrayBody
               ? 'bg-[#F97316] text-white'
@@ -1027,7 +1038,7 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
           }`}
         >
           <Eye className="w-3.5 h-3.5" />
-          <span>Рентген кузова</span>
+          <span className="hidden sm:inline">Рентген кузова</span>
         </button>
 
         <button
@@ -1035,19 +1046,23 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
           onClick={() => {
             stateRef.current.resetCameraRequested = true;
           }}
+          aria-label="Сброс ракурса"
+          title="Сброс ракурса"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#1A202C] text-slate-200 hover:bg-[#232B3A] transition-colors whitespace-nowrap shrink-0"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          <span>Сброс ракурса</span>
+          <span className="hidden sm:inline">Сброс ракурса</span>
         </button>
 
         <button
           type="button"
           onClick={() => setForce2DSchematic(true)}
+          aria-label="2D-схема"
+          title="2D-схема"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#1A202C] text-slate-200 hover:bg-[#232B3A] transition-colors whitespace-nowrap shrink-0"
         >
           <Layers className="w-3.5 h-3.5" />
-          <span>2D-схема</span>
+          <span className="hidden sm:inline">2D-схема</span>
         </button>
       </div>
     </div>
