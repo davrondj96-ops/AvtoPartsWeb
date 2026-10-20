@@ -521,3 +521,37 @@ export const GARAGE_SYSTEMS: SystemCategory[] = [
     ],
   },
 ];
+
+/**
+ * Собирает SelectedVehicle по идентификаторам из справочника VEHICLE_BRANDS.
+ * Возвращает null, если марка или модель не найдены. Поколение и модификация
+ * необязательны: при их отсутствии поля остаются пустыми.
+ */
+export function buildSelectedVehicle(
+  brandId: string,
+  modelId: string,
+  generationId: string,
+  modificationId: string
+): SelectedVehicle | null {
+  const brandObj = VEHICLE_BRANDS.find((b) => b.id === brandId);
+  const modelObj = brandObj?.models.find((m) => m.id === modelId);
+  if (!brandObj || !modelObj) return null;
+  const genObj = modelObj.generations.find((g) => g.id === generationId);
+  const modObj = genObj?.modifications.find((mod) => mod.id === modificationId);
+
+  return {
+    brandId: brandObj.id,
+    brandName: brandObj.name,
+    modelId: modelObj.id,
+    modelName: modelObj.name,
+    generationId: genObj?.id || '',
+    generationName: genObj?.name || '',
+    years: genObj?.years || '',
+    bodyStyle: genObj?.bodyStyle || 'sedan',
+    modificationId: modObj?.id || '',
+    engine: modObj?.engine || 'Модификация не указана',
+    transmission: modObj?.transmission || '',
+    drivetrain: modObj?.drivetrain || '',
+    trim: modObj?.trim || '',
+  };
+}

@@ -40,7 +40,7 @@ export const AUTO_PARTS: AutoPart[] = [
         modelId: 'bmw-3',
         generationId: 'bmw-3-f30',
         modificationIds: ['bmw-3-f30-320i-n20'],
-        notes: 'Подходит для полноприводных версий xDrive',
+        notes: 'Для F30 320i (N20) со стандартной подвеской',
       },
     ],
     analogPartIds: ['part-sachs-shock-front', 'part-bmw-oem-shock-g20'],

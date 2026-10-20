@@ -5,7 +5,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { SelectedVehicle, SystemCategory, SystemCategoryId } from '../types/garage';
 import { GARAGE_SYSTEMS } from '../data/vehicles';
 import { VehicleSchematic2D } from './VehicleSchematic2D';
-import { RotateCcw, Eye, Layers, Sparkles } from 'lucide-react';
+import { RotateCcw, Eye, Layers } from 'lucide-react';
 
 interface GarageScene3DProps {
   vehicle: SelectedVehicle;
@@ -643,15 +643,17 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
     };
-    window.addEventListener('resize', onResize);
+    const resizeObserver = new ResizeObserver(onResize);
+    resizeObserver.observe(container);
 
     // Animation loop
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer();
     let animFrameId = 0;
 
     const animate = () => {
       animFrameId = requestAnimationFrame(animate);
-      const delta = Math.min(clock.getDelta(), 0.1);
+      timer.update();
+      const delta = Math.min(timer.getDelta(), 0.1);
       const {
         selectedSystemId: selId,
         hoveredSystemId: hovId,
@@ -748,7 +750,8 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
 
     return () => {
       cancelAnimationFrame(animFrameId);
-      window.removeEventListener('resize', onResize);
+      resizeObserver.disconnect();
+      timer.dispose();
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
@@ -756,7 +759,35 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
       controls.dispose();
       floorTex.dispose();
       shadowTex.dispose();
+
+      // Освобождаем все геометрии, материалы и текстуры сцены, иначе при каждом
+      // заходе в гараж в памяти видеокарты остаётся предыдущая копия сцены.
+      const disposedTextures = new Set<THREE.Texture>();
+      const disposeMaterial = (material: THREE.Material) => {
+        for (const value of Object.values(material)) {
+          if (value instanceof THREE.Texture && !disposedTextures.has(value)) {
+            disposedTextures.add(value);
+            value.dispose();
+          }
+        }
+        material.dispose();
+      };
+      scene.traverse((obj) => {
+        if (obj instanceof THREE.InstancedMesh) obj.dispose();
+        const mesh = obj as THREE.Mesh;
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) mesh.material.forEach(disposeMaterial);
+          else disposeMaterial(mesh.material);
+        }
+      });
+      scene.environment?.dispose();
+      scene.clear();
+
       renderer.dispose();
+      // Явно отдаём WebGL-контекст: браузер держит ограниченное число контекстов.
+      renderer.forceContextLoss();
+      renderer.domElement.remove();
     };
   }, [force2DSchematic]);
 

@@ -14,28 +14,39 @@ import {
   DEFAULT_VEHICLE,
   GARAGE_SYSTEMS,
   VEHICLE_BRANDS,
+  buildSelectedVehicle,
 } from './data/vehicles';
 import { AUTO_PARTS, evaluatePartCompatibility } from './data/parts';
+import {
+  STORAGE_KEYS,
+  readStorage,
+  restoreCart,
+  restoreFavorites,
+  restoreSavedVehicles,
+  restoreVehicle,
+  vehicleKey,
+  writeStorage,
+} from './lib/storage';
 import { PartIllustration } from './components/PartIllustration';
+import { PartCard } from './components/PartCard';
+import { CompatibilityHint } from './components/CompatibilityHint';
 import { ProductDetailView } from './components/ProductDetailView';
 import { CartCheckoutView } from './components/CartCheckoutView';
+import { MyGarageView } from './components/MyGarageView';
+import { ContactsView } from './components/ContactsView';
 import {
   Search,
   ShoppingCart,
-  Heart,
   Car,
   Bookmark,
   CheckCircle2,
   AlertTriangle,
-  XCircle,
   SlidersHorizontal,
   ChevronRight,
   Home,
   LayoutGrid,
   X,
-  Phone,
-  MapPin,
-  Clock,
+  Menu,
   Info,
   Sparkles,
   RefreshCw,
@@ -54,69 +65,94 @@ type ScreenMode =
   | 'my_garage'
   | 'contacts';
 
-const STORAGE_KEYS = {
-  CART: 'apex_garage_cart_v1',
-  SAVED_GARAGE: 'apex_garage_saved_vehicles_v1',
-  FAVORITES: 'apex_garage_favorites_v1',
-  ACTIVE_VEHICLE: 'apex_garage_active_vehicle_v1',
+// Экраны отражаются в адресной строке (#/catalog, #/product/<id>), чтобы
+// работали кнопки «Назад/Вперёд», перезагрузка страницы и ссылки на товар.
+const SCREEN_PATHS: Record<Exclude<ScreenMode, 'product'>, string> = {
+  home: '',
+  garage: 'garage',
+  catalog: 'catalog',
+  cart: 'cart',
+  favorites: 'favorites',
+  my_garage: 'my-garage',
+  contacts: 'contacts',
 };
+
+interface Route {
+  screen: ScreenMode;
+  partId: string | null;
+}
+
+function parseHash(hash: string): Route {
+  const path = hash.replace(/^#\/?/, '');
+  if (path.startsWith('product/')) {
+    const partId = decodeURIComponent(path.slice('product/'.length));
+    if (AUTO_PARTS.some((p) => p.id === partId)) return { screen: 'product', partId };
+    return { screen: 'catalog', partId: null };
+  }
+  const entry = Object.entries(SCREEN_PATHS).find(([, p]) => p === path);
+  return { screen: entry ? (entry[0] as ScreenMode) : 'home', partId: null };
+}
+
+function routeToHash(screen: ScreenMode, partId: string | null): string {
+  if (screen === 'product') return partId ? `#/product/${encodeURIComponent(partId)}` : '';
+  const path = SCREEN_PATHS[screen];
+  return path ? `#/${path}` : '';
+}
+
+const MAX_PRICE_LIMIT = 80000;
+
+const NAV_LINKS: { screen: ScreenMode; label: string }[] = [
+  { screen: 'catalog', label: 'Каталог' },
+  { screen: 'garage', label: '3D-Гараж' },
+  { screen: 'my_garage', label: 'Мой гараж' },
+  { screen: 'favorites', label: 'Избранное' },
+  { screen: 'contacts', label: 'Контакты' },
+];
+
+type ToastTone = 'success' | 'warning';
 
 export default function App() {
   // Navigation & Active Screen State
-  const [screen, setScreen] = useState<ScreenMode>('home');
+  const [initialRoute] = useState<Route>(() => parseHash(window.location.hash));
+  const [screen, setScreen] = useState<ScreenMode>(initialRoute.screen);
   const [previousScreen, setPreviousScreen] = useState<ScreenMode>('catalog');
-
-  // Active Vehicle Selection State (with cascading fields)
-  const [brandId, setBrandId] = useState<string>(DEFAULT_VEHICLE.brandId);
-  const [modelId, setModelId] = useState<string>(DEFAULT_VEHICLE.modelId);
-  const [generationId, setGenerationId] = useState<string>(DEFAULT_VEHICLE.generationId);
-  const [modificationId, setModificationId] = useState<string>(DEFAULT_VEHICLE.modificationId);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   // Persisted Active Vehicle in Garage
-  const [selectedVehicle, setSelectedVehicle] = useState<SelectedVehicle | null>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_VEHICLE);
-      return saved ? JSON.parse(saved) : DEFAULT_VEHICLE;
-    } catch {
-      return DEFAULT_VEHICLE;
-    }
-  });
+  const [selectedVehicle, setSelectedVehicle] = useState<SelectedVehicle | null>(
+    () => restoreVehicle(readStorage(STORAGE_KEYS.ACTIVE_VEHICLE)) ?? DEFAULT_VEHICLE
+  );
+
+  // Форма подбора стартует с активного автомобиля, а не с автомобиля по умолчанию
+  const [brandId, setBrandId] = useState<string>(() => selectedVehicle?.brandId ?? '');
+  const [modelId, setModelId] = useState<string>(() => selectedVehicle?.modelId ?? '');
+  const [generationId, setGenerationId] = useState<string>(
+    () => selectedVehicle?.generationId ?? ''
+  );
+  const [modificationId, setModificationId] = useState<string>(
+    () => selectedVehicle?.modificationId ?? ''
+  );
 
   // Saved Vehicles ("Мой гараж")
-  const [savedVehicles, setSavedVehicles] = useState<SelectedVehicle[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.SAVED_GARAGE);
-      return saved ? JSON.parse(saved) : [DEFAULT_VEHICLE];
-    } catch {
-      return [DEFAULT_VEHICLE];
-    }
-  });
+  const [savedVehicles, setSavedVehicles] = useState<SelectedVehicle[]>(
+    () => restoreSavedVehicles(readStorage(STORAGE_KEYS.SAVED_GARAGE)) ?? [DEFAULT_VEHICLE]
+  );
 
   // Shopping Cart ("Корзина")
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.CART);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [cart, setCart] = useState<CartItem[]>(() =>
+    restoreCart(readStorage(STORAGE_KEYS.CART), AUTO_PARTS)
+  );
 
   // Favorites ("Избранное")
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.FAVORITES);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [favorites, setFavorites] = useState<string[]>(() =>
+    restoreFavorites(readStorage(STORAGE_KEYS.FAVORITES), AUTO_PARTS)
+  );
 
   // Interactive Garage & Catalog Navigation State (Preserved across product returns)
   const [selectedSystemId, setSelectedSystemId] = useState<SystemCategoryId | null>(null);
   const [hoveredSystemId, setHoveredSystemId] = useState<SystemCategoryId | null>(null);
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
-  const [activePartId, setActivePartId] = useState<string | null>(null);
+  const [activePartId, setActivePartId] = useState<string | null>(initialRoute.partId);
   const [garageDrawerOpen, setGarageDrawerOpen] = useState<boolean>(false);
 
   // Search & VIN State
@@ -129,63 +165,73 @@ export default function App() {
   const [filterOrigin, setFilterOrigin] = useState<'all' | 'original' | 'analog'>('all');
   const [filterInStockOnly, setFilterInStockOnly] = useState<boolean>(false);
   const [filterCompatibleOnly, setFilterCompatibleOnly] = useState<boolean>(false);
-  const [maxPriceFilter, setMaxPriceFilter] = useState<number>(80000);
+  const [maxPriceFilter, setMaxPriceFilter] = useState<number>(MAX_PRICE_LIMIT);
   const [sortBy, setSortBy] = useState<'popularity' | 'price_asc' | 'price_desc'>('popularity');
 
-  // Accessibility: Reduced Motion Toggle
-  const [reducedMotion, setReducedMotion] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Accessibility: Reduced Motion Toggle (по умолчанию — из настроек системы)
+  const [reducedMotion, setReducedMotion] = useState<boolean>(() => {
+    try {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      return false;
+    }
+  });
+  const [toast, setToast] = useState<{ text: string; tone: ToastTone } | null>(null);
 
   // Sync to localStorage
+  useEffect(() => writeStorage(STORAGE_KEYS.CART, cart), [cart]);
+  useEffect(() => writeStorage(STORAGE_KEYS.SAVED_GARAGE, savedVehicles), [savedVehicles]);
+  useEffect(() => writeStorage(STORAGE_KEYS.FAVORITES, favorites), [favorites]);
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cart));
-    } catch {
-      // ignore storage errors
-    }
-  }, [cart]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.SAVED_GARAGE, JSON.stringify(savedVehicles));
-    } catch {
-      // ignore
-    }
-  }, [savedVehicles]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(favorites));
-    } catch {
-      // ignore
-    }
-  }, [favorites]);
-
-  useEffect(() => {
-    try {
-      if (selectedVehicle) {
-        localStorage.setItem(STORAGE_KEYS.ACTIVE_VEHICLE, JSON.stringify(selectedVehicle));
-      }
-    } catch {
-      // ignore
-    }
+    if (selectedVehicle) writeStorage(STORAGE_KEYS.ACTIVE_VEHICLE, selectedVehicle);
   }, [selectedVehicle]);
+
+  // Sync screen -> URL hash (new history entry on every navigation)
+  useEffect(() => {
+    const target = routeToHash(screen, activePartId);
+    if (window.location.hash !== target) {
+      window.history.pushState(
+        null,
+        '',
+        target || window.location.pathname + window.location.search
+      );
+    }
+  }, [screen, activePartId]);
+
+  // URL hash -> screen (browser Back/Forward, manual hash edits)
+  useEffect(() => {
+    const onPopState = () => {
+      const route = parseHash(window.location.hash);
+      setScreen(route.screen);
+      if (route.partId) setActivePartId(route.partId);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  // New screen starts from the top; the mobile menu closes after navigation
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    setMobileMenuOpen(false);
+  }, [screen]);
 
   // Keyboard Escape handler to close drawers
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (garageDrawerOpen) setGarageDrawerOpen(false);
+        setGarageDrawerOpen(false);
+        setMobileMenuOpen(false);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [garageDrawerOpen]);
+  }, []);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
+  const showToast = (text: string, tone: ToastTone = 'success') => {
+    const next = { text, tone };
+    setToast(next);
     setTimeout(() => {
-      setToastMessage((prev) => (prev === msg ? null : prev));
+      setToast((prev) => (prev === next ? null : prev));
     }, 2600);
   };
 
@@ -225,35 +271,23 @@ export default function App() {
   };
 
   // Build SelectedVehicle from current form selections
-  const buildCurrentVehicleSelection = (): SelectedVehicle | null => {
-    const brandObj = VEHICLE_BRANDS.find((b) => b.id === brandId);
-    if (!brandObj) return null;
-    const modelObj = brandObj.models.find((m) => m.id === modelId);
-    const genObj = modelObj?.generations.find((g) => g.id === generationId);
-    const modObj = genObj?.modifications.find((mod) => mod.id === modificationId);
+  const buildCurrentVehicleSelection = (): SelectedVehicle | null =>
+    buildSelectedVehicle(brandId, modelId, generationId, modificationId);
 
-    return {
-      brandId: brandObj.id,
-      brandName: brandObj.name,
-      modelId: modelObj?.id || '',
-      modelName: modelObj?.name || '',
-      generationId: genObj?.id || '',
-      generationName: genObj?.name || '',
-      years: genObj?.years || '',
-      bodyStyle: genObj?.bodyStyle || 'sedan',
-      modificationId: modObj?.id || '',
-      engine: modObj?.engine || 'Модификация не указана',
-      transmission: modObj?.transmission || '',
-      drivetrain: modObj?.drivetrain || '',
-      trim: modObj?.trim || '',
-    };
+  // Делает автомобиль активным и подставляет его в форму подбора
+  const activateVehicle = (v: SelectedVehicle) => {
+    setSelectedVehicle(v);
+    setBrandId(v.brandId);
+    setModelId(v.modelId);
+    setGenerationId(v.generationId);
+    setModificationId(v.modificationId);
   };
 
   const handleOpenGarageFromForm = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const built = buildCurrentVehicleSelection();
-    if (!built || !built.modelId) {
-      showToast('Выберите хотя бы марку и модель автомобиля');
+    if (!built) {
+      showToast('Выберите хотя бы марку и модель автомобиля', 'warning');
       return;
     }
     setSelectedVehicle(built);
@@ -262,19 +296,18 @@ export default function App() {
 
   const handleSaveCurrentVehicleToGarage = () => {
     if (!selectedVehicle) return;
-    const exists = savedVehicles.some(
-      (v) =>
-        v.brandId === selectedVehicle.brandId &&
-        v.modelId === selectedVehicle.modelId &&
-        v.generationId === selectedVehicle.generationId &&
-        v.modificationId === selectedVehicle.modificationId
-    );
+    const exists = savedVehicles.some((v) => vehicleKey(v) === vehicleKey(selectedVehicle));
     if (exists) {
-      showToast('Этот автомобиль уже сохранён в «Мой гараж»');
+      showToast('Этот автомобиль уже сохранён в «Мой гараж»', 'warning');
       return;
     }
     setSavedVehicles((prev) => [selectedVehicle, ...prev]);
     showToast(`Сохранён в гараж: ${selectedVehicle.brandName} ${selectedVehicle.modelName}`);
+  };
+
+  const handleRemoveSavedVehicle = (v: SelectedVehicle) => {
+    setSavedVehicles((prev) => prev.filter((x) => vehicleKey(x) !== vehicleKey(v)));
+    showToast(`Удалён из гаража: ${v.brandName} ${v.modelName}`);
   };
 
   const handleSelectSystemInGarage = (sysId: SystemCategoryId) => {
@@ -290,22 +323,42 @@ export default function App() {
   );
 
   const handleAddToCart = (part: AutoPart, quantity = 1) => {
+    // Количество в корзине никогда не превышает остаток на складе
+    const inCart = cart.find((i) => i.partId === part.id)?.quantity ?? 0;
+    const allowed = Math.min(quantity, part.stockCount - inCart);
+    if (allowed <= 0) {
+      showToast(
+        `В корзине уже весь остаток: ${part.brand} ${part.sku} (${part.stockCount} шт.)`,
+        'warning'
+      );
+      return;
+    }
+
     const vehicleContext = selectedVehicle
-      ? `${selectedVehicle.brandName} ${selectedVehicle.modelName} (${selectedVehicle.generationName})`
+      ? `${selectedVehicle.brandName} ${selectedVehicle.modelName}${
+          selectedVehicle.generationName ? ` (${selectedVehicle.generationName})` : ''
+        }`
       : undefined;
 
     setCart((prev) => {
-      const existing = prev.find((i) => i.partId === part.id);
-      if (existing) {
+      if (prev.some((i) => i.partId === part.id)) {
         return prev.map((i) =>
           i.partId === part.id
-            ? { ...i, quantity: Math.min(part.stockCount, i.quantity + quantity) }
+            ? { ...i, quantity: Math.min(part.stockCount, i.quantity + allowed) }
             : i
         );
       }
-      return [...prev, { partId: part.id, quantity, vehicleContext }];
+      return [...prev, { partId: part.id, quantity: allowed, vehicleContext }];
     });
-    showToast(`В корзине: ${part.brand} ${part.sku}`);
+
+    if (allowed < quantity) {
+      showToast(
+        `Добавлено ${allowed} шт. — больше нет на складе: ${part.brand} ${part.sku}`,
+        'warning'
+      );
+    } else {
+      showToast(`В корзине: ${part.brand} ${part.sku}`);
+    }
   };
 
   const handleUpdateCartQuantity = (partId: string, newQty: number) => {
@@ -313,8 +366,9 @@ export default function App() {
       setCart((prev) => prev.filter((i) => i.partId !== partId));
       return;
     }
+    const stock = AUTO_PARTS.find((p) => p.id === partId)?.stockCount ?? newQty;
     setCart((prev) =>
-      prev.map((i) => (i.partId === partId ? { ...i, quantity: newQty } : i))
+      prev.map((i) => (i.partId === partId ? { ...i, quantity: Math.min(stock, newQty) } : i))
     );
   };
 
@@ -335,6 +389,15 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
   };
 
+  const resetCatalogFilters = () => {
+    setSearchQuery('');
+    setFilterBrand('all');
+    setFilterOrigin('all');
+    setFilterInStockOnly(false);
+    setFilterCompatibleOnly(false);
+    setMaxPriceFilter(MAX_PRICE_LIMIT);
+  };
+
   // Unique part brands for filter dropdown
   const allPartBrands = useMemo(() => {
     const set = new Set<string>();
@@ -342,7 +405,7 @@ export default function App() {
     return Array.from(set);
   }, []);
 
-  // Filtered and Sorted Parts for Catalog & Garage Drawer
+  // Filtered and Sorted Parts for Catalog
   const filteredParts = useMemo(() => {
     return AUTO_PARTS.filter((part) => {
       if (selectedSystemId && part.systemId !== selectedSystemId) return false;
@@ -387,6 +450,18 @@ export default function App() {
     selectedVehicle,
   ]);
 
+  // Панель 3D-гаража показывает детали узла без учёта фильтров каталога,
+  // чтобы поиск или ценовой фильтр не скрывали детали незаметно для покупателя.
+  const garageDrawerParts = useMemo(
+    () =>
+      AUTO_PARTS.filter(
+        (part) =>
+          (!selectedSystemId || part.systemId === selectedSystemId) &&
+          (!selectedSubcategoryId || part.subcategoryId === selectedSubcategoryId)
+      ).sort((a, b) => b.popularity - a.popularity),
+    [selectedSystemId, selectedSubcategoryId]
+  );
+
   const activeSystemObj = useMemo(
     () => GARAGE_SYSTEMS.find((s) => s.id === selectedSystemId) || null,
     [selectedSystemId]
@@ -403,113 +478,17 @@ export default function App() {
     [activePartId]
   );
 
-  // Render Single Product Card (Consistent field order & Zero-Pill metadata)
-  const renderPartCard = (part: AutoPart) => {
-    const comp = evaluatePartCompatibility(part, selectedVehicle);
-    const isFav = favorites.includes(part.id);
-
-    return (
-      <article
-        key={part.id}
-        className="group bg-[#12161F] border border-white/10 hover:border-white/25 rounded-2xl overflow-hidden flex flex-col transition-transform duration-150 hover:-translate-y-0.5"
-      >
-        {/* Product Image Slot (65% height proportions) */}
-        <div className="relative aspect-[4/3] w-full bg-[#0E1219] border-b border-white/10 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => handleOpenProductDetail(part.id)}
-            className="w-full h-full block text-left focus:outline-none"
-          >
-            <PartIllustration type={part.illustrationType} className="w-full h-full" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleToggleFavorite(part.id)}
-            aria-label={isFav ? 'Убрать из избранного' : 'В избранное'}
-            className={`absolute top-3 right-3 z-20 w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
-              isFav
-                ? 'bg-[#12161F] border-[#F97316] text-[#F97316]'
-                : 'bg-[#12161F]/80 border-white/15 text-slate-400 hover:text-white'
-            }`}
-          >
-            <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
-          </button>
-        </div>
-
-        {/* Clean Unboxed Metadata & Content */}
-        <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-          <div className="space-y-2">
-            {/* Unboxed Metadata Line */}
-            <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
-              <span className="font-semibold text-[#F97316] uppercase tracking-wider">
-                {part.brand}
-              </span>
-              <span aria-hidden="true">·</span>
-              <span className="font-mono text-slate-300">{part.sku}</span>
-              <span aria-hidden="true">·</span>
-              <span>{part.isOriginal ? 'Оригинал' : 'Аналог'}</span>
-            </div>
-
-            <h3 className="text-base font-semibold text-white leading-snug line-clamp-2">
-              <button
-                type="button"
-                onClick={() => handleOpenProductDetail(part.id)}
-                className="text-left hover:text-[#38BDF8] transition-colors"
-              >
-                {part.name}
-              </button>
-            </h3>
-
-            {/* Compatibility Indicator with Icon + Text */}
-            <div className="pt-1 flex items-center gap-1.5 text-xs">
-              {comp.status === 'compatible' && (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span className="text-emerald-300 truncate">{comp.label}</span>
-                </>
-              )}
-              {(comp.status === 'verify_required' || comp.status === 'no_vehicle') && (
-                <>
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span className="text-amber-300 truncate">Совместимость требует проверки</span>
-                </>
-              )}
-              {comp.status === 'incompatible' && (
-                <>
-                  <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                  <span className="text-rose-300 truncate">{comp.label}</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Price Baseline & Add to Cart */}
-          <div className="pt-3 border-t border-white/10 flex items-end justify-between gap-3">
-            <div>
-              <div className="text-lg font-bold text-white font-mono tabular-nums">
-                {part.price.toLocaleString('ru-RU')} ₽
-              </div>
-              <div className="text-[11px] text-slate-400">
-                {part.deliveryDays === 0
-                  ? `В наличии (${part.stockCount} шт.)`
-                  : `Под заказ ${part.deliveryDays} дн.`}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => handleAddToCart(part, 1)}
-              className="px-4 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
-            >
-              <ShoppingCart className="w-3.5 h-3.5" />
-              <span>В корзину</span>
-            </button>
-          </div>
-        </div>
-      </article>
-    );
-  };
+  const renderPartCard = (part: AutoPart) => (
+    <PartCard
+      key={part.id}
+      part={part}
+      selectedVehicle={selectedVehicle}
+      isFavorite={favorites.includes(part.id)}
+      onOpen={handleOpenProductDetail}
+      onToggleFavorite={handleToggleFavorite}
+      onAddToCart={handleAddToCart}
+    />
+  );
 
   return (
     <div className={`min-h-screen flex flex-col bg-[#0B0D11] text-[#F8FAFC] ${reducedMotion ? 'reduce-motion' : ''}`}>
@@ -528,55 +507,25 @@ export default function App() {
 
         {/* Zone 2: 5 clean single-line text navigation links */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">
-          <button
-            type="button"
-            onClick={() => setScreen('catalog')}
-            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              screen === 'catalog' ? 'border-[#F97316] text-white' : 'border-transparent'
-            }`}
-          >
-            Каталог
-          </button>
-          <button
-            type="button"
-            onClick={() => setScreen('garage')}
-            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              screen === 'garage' ? 'border-[#F97316] text-white' : 'border-transparent'
-            }`}
-          >
-            3D-Гараж
-          </button>
-          <button
-            type="button"
-            onClick={() => setScreen('my_garage')}
-            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              screen === 'my_garage' ? 'border-[#F97316] text-white' : 'border-transparent'
-            }`}
-          >
-            Мой гараж ({savedVehicles.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setScreen('favorites')}
-            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              screen === 'favorites' ? 'border-[#F97316] text-white' : 'border-transparent'
-            }`}
-          >
-            Избранное ({favorites.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setScreen('contacts')}
-            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
-              screen === 'contacts' ? 'border-[#F97316] text-white' : 'border-transparent'
-            }`}
-          >
-            Контакты
-          </button>
+          {NAV_LINKS.map((link) => (
+            <button
+              key={link.screen}
+              type="button"
+              onClick={() => setScreen(link.screen)}
+              aria-current={screen === link.screen ? 'page' : undefined}
+              className={`hover:text-white transition-colors whitespace-nowrap shrink-0 py-1 border-b-2 ${
+                screen === link.screen ? 'border-[#F97316] text-white' : 'border-transparent'
+              }`}
+            >
+              {link.label}
+              {link.screen === 'my_garage' && ` (${savedVehicles.length})`}
+              {link.screen === 'favorites' && ` (${favorites.length})`}
+            </button>
+          ))}
         </nav>
 
-        {/* Zone 3: 1 Primary Action Button (Cart with item count) */}
-        <div className="flex items-center shrink-0">
+        {/* Zone 3: 1 Primary Action Button (Cart with item count) + mobile menu toggle */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setScreen('cart')}
@@ -585,19 +534,63 @@ export default function App() {
             <ShoppingCart className="w-3.5 h-3.5" />
             <span className="font-mono tabular-nums">Корзина ({totalCartCount})</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((o) => !o)}
+            aria-label={mobileMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
+            className="md:hidden w-9 h-9 rounded-lg bg-[#1A202C] text-slate-200 hover:text-white flex items-center justify-center"
+          >
+            {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          </button>
         </div>
+
+        {/* Mobile dropdown menu: все разделы, включая отсутствующие в нижней панели */}
+        {mobileMenuOpen && (
+          <nav
+            id="mobile-menu"
+            aria-label="Меню разделов"
+            className="md:hidden absolute top-16 inset-x-0 bg-[#0B0D11] border-b border-white/10 shadow-2xl py-2"
+          >
+            {NAV_LINKS.map((link) => (
+              <button
+                key={link.screen}
+                type="button"
+                onClick={() => setScreen(link.screen)}
+                aria-current={screen === link.screen ? 'page' : undefined}
+                className={`w-full px-5 py-3 text-left text-sm font-medium transition-colors ${
+                  screen === link.screen
+                    ? 'text-[#F97316] bg-white/5'
+                    : 'text-slate-200 hover:bg-white/5'
+                }`}
+              >
+                {link.label}
+                {link.screen === 'my_garage' && ` (${savedVehicles.length})`}
+                {link.screen === 'favorites' && ` (${favorites.length})`}
+              </button>
+            ))}
+          </nav>
+        )}
       </header>
 
       {/* Toast Feedback Notification */}
-      {toastMessage && (
-        <div
-          role="status"
-          className="fixed top-20 right-4 z-50 px-4 py-3 rounded-xl bg-[#161B26] border border-[#F97316] text-xs font-medium text-white shadow-2xl flex items-center gap-2"
-        >
-          <CheckCircle2 className="w-4 h-4 text-[#F97316] shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <div role="status" aria-live="polite" className="fixed top-20 right-4 left-4 sm:left-auto z-50 pointer-events-none">
+        {toast && (
+          <div
+            className={`px-4 py-3 rounded-xl bg-[#161B26] border text-xs font-medium text-white shadow-2xl flex items-center gap-2 ${
+              toast.tone === 'warning' ? 'border-amber-500' : 'border-[#F97316]'
+            }`}
+          >
+            {toast.tone === 'warning' ? (
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-[#F97316] shrink-0" />
+            )}
+            <span>{toast.text}</span>
+          </div>
+        )}
+      </div>
 
       {/* =====================================================================
           SCREEN 1: HOME PAGE (Vehicle Selector + OEM/SKU Search + VIN Input)
@@ -1022,7 +1015,7 @@ export default function App() {
           SCREEN 2: FULLSCREEN INTERACTIVE 3D GARAGE
       ====================================================================== */}
       {screen === 'garage' && (
-        <main className="relative flex-1 flex flex-col lg:flex-row h-[calc(100vh-4rem)] overflow-hidden bg-[#090B10]">
+        <main className="relative flex-none flex flex-col lg:flex-row h-[calc(100dvh-7.5rem)] md:h-[calc(100dvh-4rem)] overflow-hidden bg-[#090B10]">
           {/* Left / Top Standard Duplicated Systems Menu (Accessible without 3D interaction) */}
           <aside className="w-full lg:w-72 bg-[#11151E] border-b lg:border-b-0 lg:border-r border-white/10 flex flex-col z-20 shrink-0 max-h-[34vh] lg:max-h-none">
             {/* Active Vehicle Info Header inside Garage */}
@@ -1118,7 +1111,7 @@ export default function App() {
           </aside>
 
           {/* Center 3D Viewport (or 2D Fallback) */}
-          <div className="relative flex-1 h-full overflow-hidden">
+          <div className="relative flex-1 min-h-0 overflow-hidden">
             {/* Active System Hover Banner at Top Center */}
             {(hoveredSystemId || selectedSystemId) && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none px-4 py-2 rounded-xl bg-[#12161F] border border-[#F97316]/60 shadow-xl text-center">
@@ -1223,22 +1216,21 @@ export default function App() {
 
                 {/* Drawer Parts List */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                  {filteredParts.length === 0 ? (
+                  {garageDrawerParts.length === 0 ? (
                     <div className="p-6 text-center text-xs text-slate-400 space-y-3">
-                      <p>По выбранным фильтрам в этой подкатегории запчасти не найдены.</p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedSubcategoryId(null);
-                          setFilterBrand('all');
-                        }}
-                        className="px-3 py-1.5 rounded-lg bg-[#1A202C] text-white"
-                      >
-                        Показать все детали раздела
-                      </button>
+                      <p>В этой подкатегории пока нет запчастей.</p>
+                      {selectedSubcategoryId && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSubcategoryId(null)}
+                          className="px-3 py-1.5 rounded-lg bg-[#1A202C] text-white"
+                        >
+                          Показать все детали раздела
+                        </button>
+                      )}
                     </div>
                   ) : (
-                    filteredParts.map((part) => {
+                    garageDrawerParts.map((part) => {
                       const comp = evaluatePartCompatibility(part, selectedVehicle);
                       return (
                         <div
@@ -1266,13 +1258,11 @@ export default function App() {
                             >
                               {part.name}
                             </button>
-                            <div className="flex items-center gap-1 text-[11px] mt-1">
-                              {comp.status === 'compatible' ? (
-                                <span className="text-emerald-400">✓ Совместимо с вашим авто</span>
-                              ) : (
-                                <span className="text-amber-300">Требуется проверка OEM</span>
-                              )}
-                            </div>
+                            <CompatibilityHint
+                              status={comp.status}
+                              label={comp.label}
+                              className="text-[11px] mt-1"
+                            />
 
                             <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-white/10">
                               <span className="text-sm font-bold text-white font-mono tabular-nums">
@@ -1309,7 +1299,7 @@ export default function App() {
                     onClick={() => setScreen('catalog')}
                     className="w-full py-2.5 px-4 rounded-xl bg-[#1A202C] hover:bg-[#232B3A] text-xs font-semibold text-white text-center transition-colors"
                   >
-                    Развернуть каталог с фильтрами ({filteredParts.length})
+                    Развернуть каталог с фильтрами ({garageDrawerParts.length})
                   </button>
                 </div>
               </div>
@@ -1472,14 +1462,7 @@ export default function App() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setFilterBrand('all');
-                    setFilterOrigin('all');
-                    setFilterInStockOnly(false);
-                    setFilterCompatibleOnly(false);
-                    setMaxPriceFilter(80000);
-                  }}
+                  onClick={resetCatalogFilters}
                   className="text-xs text-slate-400 hover:text-white"
                 >
                   Сбросить
@@ -1488,11 +1471,12 @@ export default function App() {
 
               {/* Search by SKU / OEM / Name */}
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5">
+                <label htmlFor="catalog-search" className="block text-xs text-slate-400 mb-1.5">
                   Название, артикул или OEM
                 </label>
                 <input
-                  type="text"
+                  id="catalog-search"
+                  type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Поиск по коду..."
@@ -1558,10 +1542,11 @@ export default function App() {
 
               {/* Brand Filter */}
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5">
+                <label htmlFor="catalog-brand" className="block text-xs text-slate-400 mb-1.5">
                   Производитель детали
                 </label>
                 <select
+                  id="catalog-brand"
                   value={filterBrand}
                   onChange={(e) => setFilterBrand(e.target.value)}
                   className="w-full h-10 px-3 rounded-xl bg-[#0B0D11] border border-white/15 text-xs text-white focus:outline-none focus:border-[#F97316]"
@@ -1586,7 +1571,7 @@ export default function App() {
                 <input
                   type="range"
                   min={2000}
-                  max={80000}
+                  max={MAX_PRICE_LIMIT}
                   step={1000}
                   value={maxPriceFilter}
                   onChange={(e) => setMaxPriceFilter(Number(e.target.value))}
@@ -1627,19 +1612,14 @@ export default function App() {
                     По заданным параметрам запчасти не найдены
                   </div>
                   <p className="text-xs text-slate-400 max-w-md mx-auto">
-                    Попробуйте сбросить фильтр по бренду или выбрать другой раздел автомобиля.
+                    Попробуйте изменить поисковый запрос, сбросить фильтры или выбрать другой раздел автомобиля.
                   </p>
                   <button
                     type="button"
                     onClick={() => {
                       setSelectedSystemId(null);
                       setSelectedSubcategoryId(null);
-                      setSearchQuery('');
-                      setFilterBrand('all');
-                      setFilterOrigin('all');
-                      setFilterInStockOnly(false);
-                      setFilterCompatibleOnly(false);
-                      setMaxPriceFilter(80000);
+                      resetCatalogFilters();
                     }}
                     className="px-4 py-2 rounded-xl bg-[#F97316] text-white text-xs font-semibold"
                   >
@@ -1662,6 +1642,7 @@ export default function App() {
       {screen === 'product' && activePartObj && (
         <main className="flex-1">
           <ProductDetailView
+            key={activePartObj.id}
             part={activePartObj}
             allParts={AUTO_PARTS}
             selectedVehicle={selectedVehicle}
@@ -1705,80 +1686,20 @@ export default function App() {
           SCREEN 6: SAVED VEHICLES ("МОЙ ГАРАЖ")
       ====================================================================== */}
       {screen === 'my_garage' && (
-        <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/10">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Мой гараж</h1>
-              <p className="text-xs text-slate-400 mt-1">
-                Сохранённые автомобили для быстрого переключения и проверки совместимости запчастей
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setScreen('home')}
-              className="px-4 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-semibold"
-            >
-              + Добавить автомобиль
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {savedVehicles.map((v, i) => {
-              const isCurrent =
-                selectedVehicle?.modificationId === v.modificationId &&
-                selectedVehicle?.generationId === v.generationId;
-
-              return (
-                <div
-                  key={`${v.modificationId}-${i}`}
-                  className={`p-5 rounded-2xl border flex flex-col justify-between gap-4 ${
-                    isCurrent
-                      ? 'bg-[#161B26] border-[#F97316]'
-                      : 'bg-[#12161F] border-white/10'
-                  }`}
-                >
-                  <div className="space-y-1.5">
-                    <div className="text-xs text-slate-400 flex items-center justify-between">
-                      <span>{v.years}</span>
-                      {isCurrent && (
-                        <span className="text-[#F97316] font-semibold">Активный выбор</span>
-                      )}
-                    </div>
-                    <h2 className="text-lg font-bold text-white">
-                      {v.brandName} {v.modelName} · {v.generationName}
-                    </h2>
-                    <p className="text-xs text-slate-300">
-                      {v.engine} · {v.transmission} · {v.drivetrain}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-3 border-t border-white/10">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedVehicle(v);
-                        setScreen('garage');
-                      }}
-                      className="flex-1 py-2 px-3 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-semibold"
-                    >
-                      Открыть в 3D-гараже
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedVehicle(v);
-                        setScreen('catalog');
-                      }}
-                      className="py-2 px-3 rounded-xl bg-[#1A202C] hover:bg-[#232B3A] text-slate-200 text-xs font-medium"
-                    >
-                      Каталог
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </main>
+        <MyGarageView
+          vehicles={savedVehicles}
+          activeVehicle={selectedVehicle}
+          onAddVehicle={() => setScreen('home')}
+          onOpenGarage={(v) => {
+            activateVehicle(v);
+            setScreen('garage');
+          }}
+          onOpenCatalog={(v) => {
+            activateVehicle(v);
+            setScreen('catalog');
+          }}
+          onRemove={handleRemoveSavedVehicle}
+        />
       )}
 
       {/* =====================================================================
@@ -1817,40 +1738,7 @@ export default function App() {
       {/* =====================================================================
           SCREEN 8: CONTACTS ("КОНТАКТЫ")
       ====================================================================== */}
-      {screen === 'contacts' && (
-        <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 space-y-6">
-          <div className="pb-4 border-b border-white/10">
-            <h1 className="text-2xl font-bold text-white">Контакты и клиентский сервис</h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Центральный склад, пункт самовывоза и техническая консультация по подбору
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#12161F] border border-white/10 rounded-2xl p-6 space-y-2">
-              <Phone className="w-5 h-5 text-[#F97316]" />
-              <h2 className="text-sm font-semibold text-white">Отдел подбора запчастей</h2>
-              <p className="text-base font-bold font-mono text-white">+7 (495) 740-88-90</p>
-              <p className="text-xs text-slate-400">Консультация по совместимости OEM и аналогов</p>
-            </div>
-
-            <div className="bg-[#12161F] border border-white/10 rounded-2xl p-6 space-y-2">
-              <MapPin className="w-5 h-5 text-[#38BDF8]" />
-              <h2 className="text-sm font-semibold text-white">Склад и самовывоз</h2>
-              <p className="text-xs text-slate-200 leading-relaxed">
-                г. Москва, Автозаводская ул., д. 23, корп. 7 (территория техцентра APEX GARAGE)
-              </p>
-            </div>
-
-            <div className="bg-[#12161F] border border-white/10 rounded-2xl p-6 space-y-2">
-              <Clock className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-sm font-semibold text-white">Режим работы</h2>
-              <p className="text-xs text-slate-200">Ежедневно: 09:00 — 21:00</p>
-              <p className="text-xs text-slate-400">Выдача интернет-заказов через 30 минут после подтверждения</p>
-            </div>
-          </div>
-        </main>
-      )}
+      {screen === 'contacts' && <ContactsView />}
 
       {/* =====================================================================
           MOBILE BOTTOM NAVIGATION BAR («Главная», «Гараж», «Каталог», «Корзина»)
