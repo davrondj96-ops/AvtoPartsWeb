@@ -274,10 +274,11 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
     // Overhead studio light bars
     const ceilingBarGeo = new THREE.BoxGeometry(2.6, 0.04, 0.12);
     const ceilingBarMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
-    [-1.4, 0, 1.4].forEach((zPos) => {
+    const ceilingBars = [-1.4, 0, 1.4].map((zPos) => {
       const bar = new THREE.Mesh(ceilingBarGeo, ceilingBarMat);
       bar.position.set(0, 3.2, zPos);
       scene.add(bar);
+      return bar;
     });
 
     // Atmospheric Smoke / Dust Particles (InstancedMesh > 20 items)
@@ -845,6 +846,10 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
       }
 
       controls.update();
+      // Потолочные светильники скрываются, когда камера выше них, иначе
+      // при виде сверху они перекрывают автомобиль
+      const barsVisible = camera.position.y < ceilingBars[0].position.y - 0.2;
+      ceilingBars.forEach((bar) => (bar.visible = barsVisible));
       renderer.render(scene, camera);
 
       // Project 3D Hotspot Pins onto 2D DOM Overlay coordinates
@@ -962,7 +967,7 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
               onMouseEnter={() => onHoverSystem(sys.id)}
               onMouseLeave={() => onHoverSystem(null)}
               aria-label={`Выбрать узел: ${sys.name}`}
-              className="group absolute top-0 left-0 flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F97316] rounded-full"
+              className="group absolute top-0 left-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F97316] rounded-full"
               style={{ willChange: 'transform' }}
             >
               <span
@@ -974,8 +979,9 @@ export const GarageScene3D: React.FC<GarageScene3DProps> = ({
               >
                 +
               </span>
+              {/* Подпись вынесена из потока: по точке узла центрируется только кружок */}
               <span
-                className={`px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-opacity ${
+                className={`absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-opacity pointer-events-none ${
                   isActive
                     ? 'opacity-100 bg-[#12161F] text-white border border-[#F97316]'
                     : 'opacity-0 group-hover:opacity-100 bg-[#12161F]/95 text-slate-200 border border-white/15'
